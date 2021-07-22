@@ -9,8 +9,7 @@ const config = require("./config");
 const dbContext = require("./databaseContext");
 const CosmosClient = require("@azure/cosmos").CosmosClient;
 
-const API_KEY =
-  "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";
+const API_KEY = "";
 const sgMail = require("@sendgrid/mail");
 sgMail.setApiKey(API_KEY);
 
