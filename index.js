@@ -21,6 +21,21 @@ app.use(function (req, res, next) {
   next();
 });
 
+const createContainer = (containerId, dataReceived) => {
+  const { endpoint, key, databaseId } = config;
+
+  const client = new CosmosClient({ endpoint, key });
+
+  const database = client.database(databaseId);
+  const container = database.container(containerId);
+
+  // Make sure Tasks database is already setup. If not, create it.
+  dbContext.create(client, databaseId, containerId);
+
+  const { resource: createdItem } = container.items.create(dataReceived);
+  console.log("sdsdsd", createdItem);
+};
+
 app.get("/webhook", function (req, res) {
   //io.sockets.emit("FromAPI", req.query + " : Updated");
   console.log(JSON.stringify(req.query), "params");
@@ -32,6 +47,7 @@ app.get("/webhook", function (req, res) {
   const shipmentId = req.query.shipment_id;
   const bee_name = req.query.bee_name;
   const destination = req.query.destination;
+  const timestamp = new Date().toString();
   const data = JSON.stringify(req.query);
   console.log(req.query.ambient, "ambient level");
   var message = "";
@@ -82,18 +98,16 @@ app.get("/webhook", function (req, res) {
       });
   }
 
-  const { endpoint, key, databaseId, containerId } = config;
-
-  const client = new CosmosClient({ endpoint, key });
-
-  const database = client.database(databaseId);
-  const container = database.container(containerId);
-
-  // Make sure Tasks database is already setup. If not, create it.
-  dbContext.create(client, databaseId, containerId);
-
-  const { resource: createdItem } = container.items.create(req.query);
-  console.log("sdsdsd", createdItem);
+  const trnsData = {
+    ambient,
+    shipmentId,
+    bee_name,
+    destination,
+    timestamp,
+  };
+  console.log(trnsData, "ssd12121");
+  createContainer("Sourcedata", req.query);
+  createContainer("Transformeddata", trnsData);
 
   return true;
 });

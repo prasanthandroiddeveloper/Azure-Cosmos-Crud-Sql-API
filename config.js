@@ -1,8 +1,7 @@
 const config = {
-  endpoint: "",
+  endpoint: "https://azurecosmoskapturas.documents.azure.com:443/",
   key: "",
   databaseId: "Tasks",
-  containerId: "Sourcedata",
   partitionKey: { kind: "Hash" },
 };
 
