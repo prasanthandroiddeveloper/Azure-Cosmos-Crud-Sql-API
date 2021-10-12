@@ -1,4 +1,4 @@
 {
-    "appService.deploySubpath": ".",
-    "appService.defaultWebAppToDeploy": "/subscriptions/972b1834-b9fd-46a3-a185-f3faff054425/resourceGroups/Demo/providers/Microsoft.Web/sites/Kapturamonitoring"
+  "appService.deploySubpath": ".",
+  "appService.defaultWebAppToDeploy": "/subscriptions/fe58eef2-1266-4726-be96-f3a6d1c5a24d/resourceGroups/appsvc_linux_centralus/providers/Microsoft.Web/sites/KapturaCosmosDevApp"
 }

@@ -1,6 +1,12 @@
 const express = require("express");
 const app = express();
 const cors = require("cors");
+const bodyParser = require("body-parser");
+
+app.use(bodyParser.urlencoded({ extended: false }));
+
+// parse application/json
+app.use(bodyParser.json());
 
 const port = process.env.PORT || 3000;
 const server = app.listen(port);
@@ -8,10 +14,8 @@ const config = require("./config");
 
 const dbContext = require("./databaseContext");
 const CosmosClient = require("@azure/cosmos").CosmosClient;
-
-const API_KEY = "";
-const sgMail = require("@sendgrid/mail");
-sgMail.setApiKey(API_KEY);
+const { query } = require("express");
+const { partitionKey } = require("./config");
 
 app.use(cors());
 app.use(function (req, res, next) {
@@ -36,205 +40,120 @@ const createContainer = (containerId, dataReceived) => {
   console.log("sdsdsd", createdItem);
 };
 
-app.get("/webhook", function (req, res) {
+app.get("/getAllShipments", function (req, res) {
   //io.sockets.emit("FromAPI", req.query + " : Updated");
-  console.log(JSON.stringify(req.query), "params");
-  const axios = require("axios");
-  res.send("Welcome to Roambee");
-  const timeStamp = parseInt(req.query.time * 1000);
-  var dateNew = new Date(timeStamp);
-  const ambient = req.query.ambient;
-  const shipmentId = req.query.shipment_id;
-  const bee_name = req.query.bee_name;
-  const destination = req.query.destination;
-  const timestamp = new Date().toString();
-  const data = JSON.stringify(req.query);
-  console.log(req.query.ambient, "ambient level");
-  var message = "";
-  console.log(req.query.ambient, "ambient level");
-  if (ambient <= 1) {
-    message = "Door is Closed";
-  } else if (ambient > 2 && ambient <= 5) {
-    message = "Door maybe open";
-  } else if (ambient >= 6) {
-    message = "Door is open";
-    console.log("Door is open");
-    // res.send({msg:"Door Closed"});
-  }
 
-  if (message) {
-    axios
-      .post(
-        `https://portal.roambee.com/services/shipment/get2?sid=${shipmentId}&apikey=f1970070-b231-4927-a004-e7bedae5a80c`
-      )
-      .then((res) => {
-        console.log(`statusCode: ${res.statusCode}`);
-        console.log(res.data, "Total response");
+  // createContainer("Sourcedata", req.query);
 
-        subscriptions = res.data.subscriptions;
-        if (subscriptions) {
-          subscriptions
-            .filter((item) => item.type === "ACTIVITY")
-            .map((record) => {
-              if (record.email) {
-                console.log(record.email);
-                var mailOptions = {
-                  from: "shipment.monitoring@kaptura.co",
-                  to: record.email,
-                  subject: "CONTAINER DOOR ALERT from ROAMBEE",
-                  text: `Container ${message} Alert on ${bee_name} to destination ${destination} ${new Date(
-                    timeStamp
-                  )}`,
-                  // html: '<h1>Hi Smartherd</h1><p>Your Messsage</p>'
-                };
+  const { endpoint, key, databaseId } = config;
 
-                sgMail.send(mailOptions);
-              }
-            });
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  }
+  const client = new CosmosClient({ endpoint, key });
 
-  const trnsData = {
-    ambient,
-    shipmentId,
-    bee_name,
-    destination,
-    timestamp,
+  const database = client.database(databaseId);
+  const container = database.container("Sourcedata");
+
+  const querySpec = {
+    query: "SELECT * from c",
   };
-  console.log(trnsData, "ssd12121");
-  createContainer("Sourcedata", req.query);
-  createContainer("Transformeddata", trnsData);
+
+  async function getdata() {
+    const { resources: items } = await container.items
+      .query(querySpec)
+      .fetchAll();
+    res.send(items);
+  }
+  getdata();
 
   return true;
 });
 
-app.get("/batwebhook", function (req, res) {
-  //io.sockets.emit("FromAPI", req.query + " : Updated");
-  console.log(JSON.stringify(req.query), "params");
-  const axios = require("axios");
-  res.send("Welcome to Roambee");
-  const timeStamp = parseInt(req.query.time * 1000);
-  var dateNew = new Date(timeStamp);
-  const ambient = req.query.ambient;
-  const shipmentId = req.query.shipment_id;
-  const bee_name = req.query.bee_name;
-  const destination = req.query.destination;
-  const messageJson = JSON.stringify(req.query);
-  console.log(req.query.ambient, "ambient level");
-  var message = "";
-  console.log(req.query.ambient, "ambient level");
-  if (ambient <= 1) {
-    message = "Door is Closed";
-  } else if (ambient > 2 && ambient <= 5) {
-    message = "Door maybe open";
-  } else if (ambient >= 6) {
-    message = "Door is open";
-    console.log("Door is open");
-    // res.send({msg:"Door Closed"});
+app.get("/getShipmentById", function (req, res) {
+  const { endpoint, key, databaseId } = config;
+
+  const client = new CosmosClient({ endpoint, key });
+
+  const database = client.database(databaseId);
+  const container = database.container("Sourcedata");
+
+  async function getdata() {
+    const querySpec = {
+      query: "SELECT * FROM c WHERE c.id = @id",
+      parameters: [
+        {
+          name: "@id",
+          value: req.query.id,
+        },
+      ],
+    };
+
+    const { resources: results } = await container.items
+      .query(querySpec)
+      .fetchAll();
+
+    if (results.length == 0) {
+      throw "No items found matching";
+    } else if (results.length > 1) {
+      throw "More than 1 item found matching";
+    }
+
+    const item = results[0];
+    console.log(item);
+
+    res.send(item);
   }
+  getdata();
 
-  if (message) {
-    axios
-      .post(
-        `https://portal.roambee.com/services/shipment/get2?sid=${shipmentId}&apikey=aa1140a8-219a-4fb9-b12a-c5751206a5ec`
-      )
-      .then((res) => {
-        console.log(`statusCode: ${res.statusCode}`);
-        console.log(res.data, "Total response");
+  return true;
+});
 
-        subscriptions = res.data.subscriptions;
-        if (subscriptions) {
-          subscriptions
-            .filter((item) => item.type === "ACTIVITY")
-            .map((record) => {
-              if (record.email) {
-                console.log(record.email);
-                var mailOptions = {
-                  from: "shipment.monitoring@kaptura.co",
-                  to: record.email,
-                  subject: "CONTAINER DOOR ALERT from ROAMBEE",
-                  text: `Container ${message} Alert on ${bee_name} to destination ${destination} ${new Date(
-                    timeStamp
-                  )}`,
-                  // html: '<h1>Hi Smartherd</h1><p>Your Messsage</p>'
-                };
+app.get("/deleteShipmentById", function (req, res) {
+  const { endpoint, key, databaseId } = config;
 
-                sgMail.send(mailOptions);
-              }
-            });
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+  const client = new CosmosClient({ endpoint, key });
+
+  const database = client.database(databaseId);
+  const container = database.container("Sourcedata");
+
+  try {
+    async function getdata() {
+      const { resources: results } = await container
+        .item(req.query.id, undefined)
+        .delete();
+      console.log(results);
+
+      res.send("Item deleted Successfully");
+    }
+    getdata();
+  } catch (err) {
+    console.log(err.message);
   }
 
   return true;
 });
 
-app.get("/batpngwebhook", function (req, res) {
-  //io.sockets.emit("FromAPI", req.query + " : Updated");
-  console.log(JSON.stringify(req.query), "params");
-  const axios = require("axios");
-  res.send("Welcome to Roambee");
-  const timeStamp = parseInt(req.query.time * 1000);
-  var dateNew = new Date(timeStamp);
-  const ambient = req.query.ambient;
-  const shipmentId = req.query.shipment_id;
-  const bee_name = req.query.bee_name;
-  const destination = req.query.destination;
-  const messageJson = JSON.stringify(req.query);
-  console.log(req.query.ambient, "ambient level");
-  var message = "";
-  console.log(req.query.ambient, "ambient level");
-  if (ambient <= 1) {
-    message = "Door is Closed";
-  } else if (ambient > 2 && ambient <= 5) {
-    message = "Door maybe open";
-  } else if (ambient >= 6) {
-    message = "Door is open";
-    console.log("Door is open");
-    // res.send({msg:"Door Closed"});
-  }
+app.get("/updateShipmentById", function (req, res) {
+  const { endpoint, key, databaseId } = config;
 
-  if (message) {
-    axios
-      .post(
-        `https://portal.roambee.com/services/shipment/get2?sid=${shipmentId}&apikey=3898fe77-37be-4c08-affa-e0f04e8f00c4`
-      )
-      .then((res) => {
-        console.log(`statusCode: ${res.statusCode}`);
-        console.log(res.data, "Total response");
+  const client = new CosmosClient({ endpoint, key });
 
-        subscriptions = res.data.subscriptions;
-        if (subscriptions) {
-          subscriptions
-            .filter((item) => item.type === "ACTIVITY")
-            .map((record) => {
-              if (record.email) {
-                console.log(record.email);
-                var mailOptions = {
-                  from: "shipment.monitoring@kaptura.co",
-                  to: record.email,
-                  subject: "CONTAINER DOOR ALERT from ROAMBEE",
-                  text: `Container ${message} Alert on ${bee_name} to destination ${destination} ${new Date(
-                    timeStamp
-                  )}`,
-                  // html: '<h1>Hi Smartherd</h1><p>Your Messsage</p>'
-                };
+  const database = client.database(databaseId);
+  const container = database.container("Sourcedata");
 
-                sgMail.send(mailOptions);
-              }
-            });
-        }
-      })
-      .catch((error) => {
-        console.error(error);
-      });
+  try {
+    async function getdata() {
+      console.log(req.body, "body response");
+      console.log(req.query.id, "id response");
+      const { resource: updatedItem } = await container
+        .item(req.query.id, undefined)
+        .replace(req.body);
+      res.send("Item Updated successfully");
+      // console.log(updatedItem);
+
+      //res.send(item);
+    }
+    getdata();
+  } catch (err) {
+    console.log(err.message);
   }
 
   return true;
